@@ -72,6 +72,19 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > id_rsa
           chmod 600 id_rsa
 
+      - name: Wait for SSH to be ready
+        run: |
+          for i in {1..30}; do
+            if ssh -i id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=5 azureuser@${{ needs.terraform.outputs.ip }} "echo SSH ready"; then
+              echo "SSH is ready"
+              break
+            fi
+            echo "Waiting for SSH... attempt $i/30"
+            sleep 10
+          done
+
       - name: Run Ansible
         working-directory: infra/ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: False
         run: ansible-playbook -i inventory playbook.yml
