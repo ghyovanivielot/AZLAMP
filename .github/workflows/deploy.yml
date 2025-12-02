@@ -1,0 +1,60 @@
+name: Deploy LAMP to Azure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Set these secrets in GitHub: AZURE_CLIENT_ID, TENANT, SUBSCRIPTION, CLIENT_SECRET
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            }
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -var ssh_pub_key="${{ secrets.SSH_PUB_KEY }}"
+
+      - name: Save Public IP
+        id: output
+        working-directory: infra/terraform
+        run: echo "ip=$(terraform output -raw public_ip)" >> "$GITHUB_OUTPUT"
+
+  ansible:
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: sudo apt-get update && sudo apt-get install -y ansible
+
+      - name: Configure inventory
+        run: |
+          echo "[lamp]" > infra/ansible/inventory
+          echo "${{ needs.terraform.outputs.ip }} ansible_user=azureuser ansible_ssh_private_key_file=id_rsa" >> infra/ansible/inventory
+
+      - name: Add SSH Key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > id_rsa
+          chmod 600 id_rsa
+
+      - name: Run Ansible
+        working-directory: infra/ansible
+        run: ansible-playbook -i inventory playbook.yml

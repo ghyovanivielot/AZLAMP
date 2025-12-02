@@ -1,0 +1,21 @@
+- name: Install packages
+  apt:
+    name:
+      - apache2
+      - php
+      - php-mysql
+      - mysql-server
+    state: present
+    update_cache: yes
+
+- name: Enable and start Apache
+  systemd:
+    name: apache2
+    enabled: yes
+    state: started
+
+- name: Deploy test PHP page
+  template:
+    src: index.php.j2
+    dest: /var/www/html/index.php
+    mode: 0644
