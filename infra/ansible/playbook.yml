@@ -1,4 +1,29 @@
+---
 - hosts: lamp
   become: yes
-  roles:
-    - lamp
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install LAMP stack
+      apt:
+        name:
+          - apache2
+          - mysql-server
+          - php
+          - php-mysql
+          - libapache2-mod-php
+        state: present
+
+    - name: Start Apache
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Start MySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes

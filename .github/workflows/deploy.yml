@@ -5,23 +5,24 @@ on:
   push:
     branches: ["main"]
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    outputs:
+      ip: ${{ steps.output.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
 
-      # Set these secrets in GitHub: AZURE_CLIENT_ID, TENANT, SUBSCRIPTION, CLIENT_SECRET
-      - name: Azure Login
+      - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          creds: |
-            {
-              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
-              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
-              "tenantId": "${{ secrets.AZURE_TENANT_ID }}",
-              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            }
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terraform Init
         working-directory: infra/terraform
@@ -29,7 +30,7 @@ jobs:
 
       - name: Terraform Apply
         working-directory: infra/terraform
-        run: terraform apply -auto-approve -var ssh_pub_key="${{ secrets.SSH_PUB_KEY }}"
+        run: terraform apply -auto-approve -var="ssh_pub_key=${{ secrets.SSH_PUB_KEY }}"
 
       - name: Save Public IP
         id: output
